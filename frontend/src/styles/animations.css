@@ -1,0 +1,30 @@
+@keyframes pulseGlow {
+  0% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+
+@keyframes fadeInScale {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeInScale 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.live-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--accent-success);
+  display: inline-block;
+  box-shadow: 0 0 8px var(--accent-success);
+  animation: pulseGlow 2s infinite;
+}
+
+.live-indicator.offline {
+  background-color: var(--accent-error);
+  box-shadow: 0 0 8px var(--accent-error);
+  animation: none;
+}
