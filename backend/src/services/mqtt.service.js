@@ -1,50 +1,151 @@
 const mqttClient = require('../config/mqtt');
 const logger = require('../config/logger');
-const cacheService = require('./cache.service');
+const cacheService = require('./cache.service'); // for legacy servo data
 const { telemetrySchema } = require('../schemas/telemetry.schema');
 
+const Device = require('../models/device.model');
+const DynamicTelemetry = require('../models/dynamicTelemetry.model');
+const { componentsConfig, COMPONENT_KEYS } = require('../config/components');
+
 let io = null;
+
+// In-memory cache for dynamic devices to avoid DB hits on every message
+// format: { "dev123": { components: ["temp", "hum"], lastSeenUpdated: 1612... } }
+const deviceCache = {};
+
+// Throttle interval for lastSeen updates (milliseconds)
+const LAST_SEEN_THROTTLE_MS = 30000;
+
+// Helper to validate and filter dynamic payload based on allowed components
+const processDynamicPayload = (rawPayload, allowedComponents) => {
+  const filteredData = {};
+  let hasValidData = false;
+
+  allowedComponents.forEach(comp => {
+    if (rawPayload.hasOwnProperty(comp)) {
+      const val = rawPayload[comp];
+      const conf = componentsConfig[comp];
+      
+      if (conf) {
+        // Enforce type and min/max logic
+        if (conf.type === 'Number' && typeof val === 'number') {
+          if (val >= conf.min && val <= conf.max) {
+             filteredData[comp] = val;
+             hasValidData = true;
+          }
+        } else if (conf.type === 'Boolean' && typeof val === 'boolean') {
+          filteredData[comp] = val;
+          hasValidData = true;
+        } else if (conf.type === 'Boolean' && typeof val === 'number') {
+           // Allow 0/1 as boolean
+           filteredData[comp] = val !== 0;
+           hasValidData = true;
+        }
+      }
+    }
+  });
+
+  return { isValid: hasValidData, filteredData };
+};
+
 
 const initMqttService = (socketIoInstance) => {
   io = socketIoInstance;
 
   mqttClient.on('connect', () => {
-    const topic = 'devices/+/telemetry';
+    const legacyTopic = 'devices/+/telemetry';     // Old hardware
+    const servoTopic = 'devices/servo/+/telemetry';  // New servo architecture routing
+    const dynamicTopic = 'devices/dynamic/+/telemetry';
 
-    mqttClient.subscribe(topic, (err) => {
+    mqttClient.subscribe([legacyTopic, servoTopic, dynamicTopic], (err) => {
       if (err) {
         logger.error(`MQTT Subscription Error: ${err.message}`);
       } else {
-        logger.info(`SUCCESS: Subscribed to topic: ${topic}`);
+        logger.info(`SUCCESS: Subscribed to topics: ${legacyTopic}, ${servoTopic}, ${dynamicTopic}`);
       }
     });
   });
 
-  mqttClient.on('message', (topic, message) => {
+  mqttClient.on('message', async (topic, message) => {
     try {
       const payloadString = message.toString();
       const rawPayload = JSON.parse(payloadString);
 
-      // Validate incoming data against our Zod schema
-      const validateResult = telemetrySchema.safeParse(rawPayload);
+      // --- LEGACY SERVO PIPELINE ---
+      // Matches both 3-level 'devices/esp32_01/telemetry' and 4-level 'devices/servo/...'
+      if (topic.startsWith('devices/servo/') || topic.split('/').length === 3) {
+        const validateResult = telemetrySchema.safeParse(rawPayload);
 
-      if (!validateResult.success) {
-        logger.warn(`Invalid payload on topic ${topic}: ${validateResult.error.message}`);
+        if (!validateResult.success) {
+          logger.warn(`Invalid servo payload on topic ${topic}: ${validateResult.error.message}`);
+          return;
+        }
+
+        const payload = validateResult.data;
+        payload.timestamp = new Date().toISOString(); 
+        
+        // Ingest to in-memory cache and background aggregation buffer
+        cacheService.ingestData(payload.device_id, payload);
+
+        // Broadcast live data to Dashboard clients
+        if (io) {
+          io.emit('telemetry', payload);
+        }
         return;
       }
 
-      const payload = validateResult.data;
-      payload.timestamp = new Date().toISOString(); // Inject backend time
-      
-      // Ingest to in-memory cache and background aggregation buffer
-      cacheService.ingestData(payload.device_id, payload);
+      // --- DYNAMIC CONTROLLED PIPELINE ---
+      if (topic.startsWith('devices/dynamic/')) {
+        const parts = topic.split('/');
+        const deviceId = parts[2]; // devices/dynamic/{deviceId}/telemetry
 
-      // Log success to terminal
-      logger.info(`MQTT Rx -> ${topic}: device_id=${payload.device_id}, servo=${payload.servo_angle}, status=${payload.status}`);
+        // Fetch from cache or DB
+        let deviceConfig = deviceCache[deviceId];
+        if (!deviceConfig) {
+          const dbDev = await Device.findOne({ deviceId });
+          if (!dbDev) {
+             logger.warn(`Unknown dynamic device received data: ${deviceId}`);
+             return;
+          }
+          deviceCache[deviceId] = {
+            components: dbDev.components,
+            lastSeenUpdated: 0
+          };
+          deviceConfig = deviceCache[deviceId];
+        }
 
-      // Broadcast live data to Dashboard clients
-      if (io) {
-        io.emit('telemetry', payload);
+        // Validate & Filter Data
+        const { isValid, filteredData } = processDynamicPayload(rawPayload, deviceConfig.components);
+
+        if (!isValid) {
+           logger.warn(`No valid configured components found in payload for ${deviceId}`);
+           return;
+        }
+
+        const now = Date.now();
+        
+        // Update lastSeen throttled
+        if (now - deviceConfig.lastSeenUpdated > LAST_SEEN_THROTTLE_MS) {
+           await Device.updateOne({ deviceId }, { $set: { lastSeen: new Date(now) } });
+           deviceConfig.lastSeenUpdated = now;
+        }
+
+        // Store exactly the filtered fields
+        const record = new DynamicTelemetry({
+           deviceId,
+           timestamp: new Date(now),
+           data: filteredData
+        });
+        await record.save();
+
+        if (io) {
+           // Emit specialized event for dynamic dashboard
+           io.emit(`dynamic_telemetry_${deviceId}`, {
+             deviceId,
+             timestamp: new Date(now).toISOString(),
+             data: filteredData
+           });
+        }
       }
 
     } catch (err) {

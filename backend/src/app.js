@@ -10,7 +10,9 @@ const logger = require('./config/logger');
 const connectDB = require('./config/db');
 
 // Router
+const authRoutes = require('./routes/auth.routes');
 const telemetryRoutes = require('./routes/telemetry.routes');
+const deviceRoutes = require('./routes/device.routes');
 
 // Services
 const { initMqttService } = require('./services/mqtt.service');
@@ -21,17 +23,23 @@ const server = http.createServer(app);
 // Initialize WebSocket with CORS setup
 const io = new Server(server, {
   cors: {
-    origin: '*', // TODO: Constrain to Cloudflare Pages domain in production
+    origin: env.FRONTEND_URL,
     methods: ['GET', 'POST']
   }
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: env.FRONTEND_URL,
+  methods: ['GET', 'POST', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 
 // REST API Routes
+app.use('/api/auth', authRoutes);
 app.use('/api', telemetryRoutes);
+app.use('/api', deviceRoutes);
 
 // Health check definition (ideal for AWS target groups / render checks)
 app.get('/health', (req, res) => res.json({ status: 'OK', uptime: process.uptime() }));

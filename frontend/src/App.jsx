@@ -1,55 +1,48 @@
-import React, { useEffect, useState } from 'react';
-import { socket } from './services/socket';
-import { useSocketData } from './hooks/useSocketData';
-import LiveStatusCard from './components/LiveStatusCard';
-import RealTimeGraph from './components/RealTimeGraph';
-import HistoricalGraph from './components/HistoricalGraph';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import './App.css';
+
+// Guard component for protected routes
+const PrivateRoute = ({ children }) => {
+  const { isAuthenticated, isLoading } = useAuth();
+  
+  if (isLoading) return null; // handled by AuthProvider loading state
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+};
+
+// Route wrapper
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route 
+        path="/" 
+        element={
+          <PrivateRoute>
+            <Dashboard />
+          </PrivateRoute>
+        } 
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
 
 function App() {
-  const [isConnected, setIsConnected] = useState(false);
-  const { telemetry, history } = useSocketData();
-
-  useEffect(() => {
-    socket.connect();
-    
-    socket.on('connect', () => setIsConnected(true));
-    socket.on('disconnect', () => setIsConnected(false));
-    
-    return () => {
-      socket.off('connect');
-      socket.off('disconnect');
-      socket.disconnect();
-    };
-  }, []);
-
   return (
-    <>
-      {/* Decorative Orbs */}
-      <div className="bg-blob bg-blob-1"></div>
-      <div className="bg-blob bg-blob-2"></div>
-
-      <main style={{ padding: 'var(--spacing-xl)', maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xl)' }}>
-        <header className="glass-panel animate-fade-in" style={{ padding: 'var(--spacing-md) var(--spacing-xl)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 600 }}>IoT Data Hub</h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
-            <span className={`live-indicator ${!isConnected ? 'offline' : ''}`}></span>
-            <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-              {isConnected ? 'Connected' : 'Disconnected'}
-            </span>
-          </div>
-        </header>
-
-        <section className="dashboard-grid">
-          {/* Main layout grid */}
-          <LiveStatusCard data={telemetry} />
-          <RealTimeGraph history={history} />
-        </section>
-
-        <section className="glass-panel animate-fade-in" style={{ padding: 'var(--spacing-lg)', minHeight: '400px', animationDelay: '0.3s' }}>
-           <HistoricalGraph />
-        </section>
-      </main>
-    </>
+    <AuthProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 

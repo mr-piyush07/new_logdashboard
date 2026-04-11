@@ -4,6 +4,6 @@ const telemetryController = require('../controllers/telemetry.controller');
 
 router.get('/telemetry/latest', telemetryController.getLatest);
 router.get('/telemetry/history', telemetryController.getHistory);
-router.get('/devices', telemetryController.getDevices);
+router.get('/legacy-devices', telemetryController.getDevices);
 
 module.exports = router;
