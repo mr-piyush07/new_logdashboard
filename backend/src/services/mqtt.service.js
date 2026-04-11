@@ -69,7 +69,15 @@ const initMqttService = (socketIoInstance) => {
   mqttClient.on('message', async (topic, message) => {
     try {
       const payloadString = message.toString();
-      const rawPayload = JSON.parse(payloadString);
+      logger.info(`INCOMING MQTT: Topic=[${topic}] Payload=[${payloadString}]`);
+      
+      let rawPayload;
+      try {
+        rawPayload = JSON.parse(payloadString);
+      } catch (parseErr) {
+        logger.error(`MQTT JSON Parse Error on topic ${topic}: ${parseErr.message}`);
+        return;
+      }
 
       // --- LEGACY SERVO PIPELINE ---
       // Matches both 3-level 'devices/esp32_01/telemetry' and 4-level 'devices/servo/...'

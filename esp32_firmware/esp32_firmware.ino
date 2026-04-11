@@ -25,15 +25,21 @@ PubSubClient mqttClient(secureClient);
 unsigned long lastMsgTime = 0;
 const unsigned long MSG_INTERVAL = 2000; // 2 seconds
 
+// --- State Variables ---
+bool systemPower = false;
+int currentServoAngle = 0;
+
 // --- Function Prototypes ---
 void setupWiFi();
 void connectMQTT();
 void publishTelemetry();
+void mqttCallback(char* topic, byte* payload, unsigned int length);
 
 void setup() {
   Serial.begin(115200);
+  delay(100);
   
-  // Seed random generator for simulated servo data
+  // Seed random generator - kept for other uses if needed, but removed from periodic telemetry
   randomSeed(analogRead(0));
 
   setupWiFi();
@@ -41,8 +47,9 @@ void setup() {
   // Option A (Development Mode): Bypass SSL Certificate Verification
   secureClient.setInsecure();
 
-  // Set MQTT server
+  // Set MQTT server and callback
   mqttClient.setServer(MQTT_HOST, MQTT_PORT);
+  mqttClient.setCallback(mqttCallback);
 }
 
 void loop() {
@@ -82,18 +89,60 @@ void connectMQTT() {
   while (!mqttClient.connected()) {
     Serial.print("Attempting MQTT connection...");
     
-    // Generate a random Client ID to prevent connection drops if multiple devices are used later
+    // Generate a random Client ID
     String clientId = "ESP32Client-";
     clientId += String(random(0xffff), HEX);
 
     // Attempt to connect over TLS
     if (mqttClient.connect(clientId.c_str(), MQTT_USERNAME, MQTT_PASSWORD)) {
       Serial.println("SUCCESS - Connected to HiveMQ Cloud");
+      
+      // Subscribe to control topic
+      String controlTopic = "devices/";
+      controlTopic += DEVICE_ID;
+      controlTopic += "/control";
+      mqttClient.subscribe(controlTopic.c_str());
+      Serial.print("Subscribed to: ");
+      Serial.println(controlTopic);
     } else {
       Serial.print("FAILED, rc=");
       Serial.print(mqttClient.state());
       Serial.println(" - Retrying in 5 seconds...");
       delay(5000);
+    }
+  }
+}
+
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  Serial.print("Message arrived on topic: ");
+  Serial.println(topic);
+
+  String message = "";
+  for (int i = 0; i < length; i++) {
+    message += (char)payload[i];
+  }
+  Serial.print("Payload: ");
+  Serial.println(message);
+
+  // Parse JSON command
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, message);
+
+  if (error) {
+    Serial.print("deserializeJson() failed: ");
+    Serial.println(error.c_str());
+    return;
+  }
+
+  // Handle Power Command
+  if (doc["command"] == "power") {
+    String state = doc["state"];
+    if (state == "ON") {
+      systemPower = true;
+      Serial.println("SYSTEM POWER: ON");
+    } else if (state == "OFF") {
+      systemPower = false;
+      Serial.println("SYSTEM POWER: OFF");
     }
   }
 }
@@ -104,8 +153,8 @@ void publishTelemetry() {
   
   // Populate JSON payload
   doc["device_id"] = DEVICE_ID;
-  doc["servo_angle"] = random(0, 181); // Simulating an angle between 0 and 180
-  doc["status"] = "active";
+  doc["servo_angle"] = currentServoAngle; // No longer random
+  doc["status"] = systemPower ? "active" : "standby";
   doc["uptime"] = millis();
 
   // Serialize to a string
@@ -119,3 +168,4 @@ void publishTelemetry() {
   // Publish payload to Topic
   mqttClient.publish(MQTT_TOPIC, jsonBuffer);
 }
+

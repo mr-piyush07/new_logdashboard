@@ -23,14 +23,14 @@ const server = http.createServer(app);
 // Initialize WebSocket with CORS setup
 const io = new Server(server, {
   cors: {
-    origin: env.FRONTEND_URL,
+    origin: '*',
     methods: ['GET', 'POST']
   }
 });
 
 // Middleware
 app.use(cors({
-  origin: env.FRONTEND_URL,
+  origin: '*',
   methods: ['GET', 'POST', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
