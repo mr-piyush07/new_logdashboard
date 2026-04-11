@@ -18,8 +18,10 @@ const HistoricalGraph = () => {
       const historyData = Array.isArray(res) ? res : (res.data || []);
       setData([...historyData].reverse());
     } catch (err) {
-      setError(err.message);
+      console.error('Error loading historical data:', err);
+      setError(`Fetch Error: ${err.message}`);
     } finally {
+
       setLoading(false);
     }
   };

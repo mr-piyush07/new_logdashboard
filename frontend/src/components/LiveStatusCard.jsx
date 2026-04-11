@@ -38,8 +38,8 @@ const LiveStatusCard = ({ data }) => {
           <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.3rem' }}>
             <Power size={14} /> System Status
           </span>
-          <div style={{ fontSize: '1.1rem', fontWeight: 600, color: status === 'ACTIVE' ? 'var(--accent-success)' : 'var(--accent-warning)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <span className={status === 'ACTIVE' ? 'live-indicator' : 'live-indicator offline'}></span>
+          <div style={{ fontSize: '1.1rem', fontWeight: 600, color: status?.toLowerCase() === 'active' ? 'var(--accent-success)' : 'var(--accent-warning)', display: 'flex', alignItems: 'center', gap: '0.4rem', textTransform: 'capitalize' }}>
+            <span className={status?.toLowerCase() === 'active' ? 'live-indicator' : 'live-indicator offline'}></span>
             {status}
           </div>
         </div>

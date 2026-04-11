@@ -8,9 +8,9 @@ const DeviceManager = ({ onDeviceCreated }) => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
     // Fetch available components configuration
-    fetch(`${API_URL}/api/components-config`)
+    fetch(`${API_URL}/components-config`)
       .then(res => {
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         return res.json();
@@ -48,9 +48,9 @@ const DeviceManager = ({ onDeviceCreated }) => {
     setLoading(true);
     setError('');
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
     try {
-      const response = await fetch(`${API_URL}/api/devices`, {
+      const response = await fetch(`${API_URL}/devices`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId, components: selectedComponents })
@@ -149,37 +149,48 @@ const DeviceManager = ({ onDeviceCreated }) => {
                     style={{
                       position: 'relative',
                       overflow: 'hidden',
-                      padding: '12px 14px',
-                      background: isSelected ? 'rgba(var(--brand-primary-rgb), 0.15)' : 'rgba(255, 255, 255, 0.03)',
-                      border: isSelected ? '1.5px solid var(--brand-primary)' : '1px solid var(--border-color)',
-                      borderRadius: 'var(--radius-md)',
+                      padding: '16px',
+                      background: isSelected ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                      border: isSelected ? '1.5px solid var(--accent-success)' : '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: '12px',
                       cursor: 'pointer',
-                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'flex-start',
-                      boxShadow: isSelected ? '0 4px 12px rgba(var(--brand-primary-rgb), 0.15)' : 'none',
-                      transform: isSelected ? 'translateY(-2px)' : 'none'
+                      boxShadow: isSelected ? '0 4px 16px rgba(16, 185, 129, 0.2)' : 'none',
+                      transform: isSelected ? 'translateY(-3px)' : 'none'
                     }}
                     onMouseEnter={(e) => {
-                       if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                       if (!isSelected) {
+                         e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                         e.currentTarget.style.transform = 'translateY(-1px)';
+                       }
                     }}
                     onMouseLeave={(e) => {
-                       if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                       if (!isSelected) {
+                         e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                         e.currentTarget.style.transform = 'none';
+                       }
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                       <div style={{ 
-                        width: '8px', height: '8px', borderRadius: '50%', 
-                        background: isSelected ? 'var(--brand-primary)' : 'rgba(255,255,255,0.2)',
-                        transition: 'background 0.3s ease'
-                      }}></div>
-                      <span style={{ fontWeight: 600, color: isSelected ? '#fff' : 'var(--text-primary)', textTransform: 'capitalize', fontSize: '0.9rem' }}>
+                        width: '18px', height: '18px', borderRadius: '4px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: isSelected ? 'var(--accent-success)' : 'rgba(255,255,255,0.1)',
+                        transition: 'all 0.3s ease'
+                      }}>
+                        {isSelected && (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        )}
+                      </div>
+                      <span style={{ fontWeight: 600, color: isSelected ? '#10b981' : '#e2e8f0', textTransform: 'capitalize', fontSize: '0.95rem' }}>
                         {key.replace('_', ' ')}
                       </span>
                     </div>
-                    <span style={{ fontSize: '0.75rem', color: isSelected ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary)', paddingLeft: '16px' }}>
-                      {conf.type} {conf.unit ? `(${conf.unit})` : ''}
+                    <span style={{ fontSize: '0.8rem', color: isSelected ? 'rgba(16, 185, 129, 0.8)' : '#94a3b8', paddingLeft: '28px', textAlign: 'left', lineHeight: '1.3' }}>
+                      {conf.type} {conf.unit ? `(${conf.unit})` : ''} - Detects analog {key} variation array
                     </span>
                   </button>
                 );

@@ -153,5 +153,23 @@ const initMqttService = (socketIoInstance) => {
     }
   });
 };
+const publishControlCommand = (deviceId, commandPayload) => {
+  if (!mqttClient.connected) {
+    logger.error('Cannot publish command, MQTT is disconnected.');
+    throw new Error('MQTT broker is disconnected');
+  }
+  const topic = `devices/${deviceId}/control`;
+  const payloadStr = JSON.stringify(commandPayload);
+  
+  logger.info(`OUTGOING MQTT: Topic=[${topic}] Payload=[${payloadStr}]`);
+  
+  mqttClient.publish(topic, payloadStr, { qos: 1, retain: false }, (err) => {
+    if (err) {
+      logger.error(`Failed to publish control command to ${topic}: ${err.message}`);
+    } else {
+      logger.info(`Successfully dispatched control command to broker.`);
+    }
+  });
+};
 
-module.exports = { initMqttService };
+module.exports = { initMqttService, publishControlCommand };

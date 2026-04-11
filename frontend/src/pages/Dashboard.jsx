@@ -7,6 +7,8 @@ import LiveStatusCard from '../components/LiveStatusCard';
 import RealTimeGraph from '../components/RealTimeGraph';
 import HistoricalGraph from '../components/HistoricalGraph';
 import DynamicDashboard from '../components/DynamicDashboard';
+import SerialMonitor from '../components/SerialMonitor';
+import ControlPanel from '../components/ControlPanel';
 import { LogOut, User } from 'lucide-react';
 
 function Dashboard() {
@@ -17,15 +19,17 @@ function Dashboard() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    socket.connect();
-    
-    socket.on('connect', () => setIsConnected(true));
-    socket.on('disconnect', () => setIsConnected(false));
+    const onConnect = () => setIsConnected(true);
+    const onDisconnect = () => setIsConnected(false);
+
+    setIsConnected(socket.connected);
+
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
     
     return () => {
-      socket.off('connect');
-      socket.off('disconnect');
-      socket.disconnect();
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
     };
   }, []);
 
@@ -101,6 +105,26 @@ function Dashboard() {
             }}>
             Dynamic Platform (Beta)
           </button>
+          <button 
+            onClick={() => setActiveTab('logs')}
+            style={{ 
+              background: 'none', border: 'none', padding: 'var(--spacing-sm) var(--spacing-md)', cursor: 'pointer', fontSize: '1.1rem',
+              color: activeTab === 'logs' ? 'var(--brand-primary)' : 'var(--text-secondary)',
+              borderBottom: activeTab === 'logs' ? '2px solid var(--brand-primary)' : '2px solid transparent',
+              fontWeight: 600
+            }}>
+            Data Logs
+          </button>
+          <button 
+            onClick={() => setActiveTab('control')}
+            style={{ 
+              background: 'none', border: 'none', padding: 'var(--spacing-sm) var(--spacing-md)', cursor: 'pointer', fontSize: '1.1rem',
+              color: activeTab === 'control' ? 'var(--brand-primary)' : 'var(--text-secondary)',
+              borderBottom: activeTab === 'control' ? '2px solid var(--brand-primary)' : '2px solid transparent',
+              fontWeight: 600
+            }}>
+            Hardware Control
+          </button>
         </div>
 
         {activeTab === 'servo' ? (
@@ -115,9 +139,13 @@ function Dashboard() {
               <HistoricalGraph />
             </section>
           </>
-        ) : (
+        ) : activeTab === 'dynamic' ? (
           <DynamicDashboard />
-        )}
+        ) : activeTab === 'logs' ? (
+          <SerialMonitor />
+        ) : activeTab === 'control' ? (
+          <ControlPanel telemetry={telemetry} />
+        ) : null}
       </main>
     </>
   );

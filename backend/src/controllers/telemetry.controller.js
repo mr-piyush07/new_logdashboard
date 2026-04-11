@@ -1,5 +1,6 @@
 const cacheService = require('../services/cache.service');
 const telemetryService = require('../services/telemetry.service');
+const { publishControlCommand } = require('../services/mqtt.service');
 const logger = require('../config/logger');
 
 const getLatest = (req, res) => {
@@ -37,8 +38,23 @@ const getDevices = (req, res) => {
   return res.json({ devices });
 };
 
+const postControl = (req, res) => {
+  const { device_id, command, state } = req.body;
+  if (!device_id || !command || !state) {
+    return res.status(400).json({ error: 'device_id, command, and state are required fields in the payload.' });
+  }
+
+  try {
+    publishControlCommand(device_id, { command, state });
+    return res.json({ success: true, message: `Command successfully dispatched to ${device_id}.` });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to dispatch command to broker.'});
+  }
+};
+
 module.exports = {
   getLatest,
   getHistory,
-  getDevices
+  getDevices,
+  postControl
 };

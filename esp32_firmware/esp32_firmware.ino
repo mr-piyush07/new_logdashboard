@@ -5,8 +5,8 @@
 
 // --- Configuration ---
 // Wi-Fi
-#define WIFI_SSID "Piyush Kushwah"
-#define WIFI_PASSWORD "12345678"
+#define WIFI_SSID "oppoF17"
+#define WIFI_PASSWORD "123456789"
 
 // MQTT - HiveMQ Cloud
 #define MQTT_HOST "dd2850a79b434dd99693c51b23d03f8d.s1.eu.hivemq.cloud"
