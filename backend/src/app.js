@@ -41,6 +41,15 @@ app.use('/api/auth', authRoutes);
 app.use('/api', telemetryRoutes);
 app.use('/api', deviceRoutes);
 
+// Root route for basic status check
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'IoT Log Dashboard API is running',
+    version: '1.0.0',
+    status: 'online'
+  });
+});
+
 // Health check definition (ideal for AWS target groups / render checks)
 app.get('/health', (req, res) => res.json({ status: 'OK', uptime: process.uptime() }));
 
