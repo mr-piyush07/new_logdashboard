@@ -20,17 +20,20 @@ const { initMqttService } = require('./services/mqtt.service');
 const app = express();
 const server = http.createServer(app);
 
+// Handle multiple origins
+const origins = env.FRONTEND_URL.split(',').map(url => url.trim());
+
 // Initialize WebSocket with CORS setup
 const io = new Server(server, {
   cors: {
-    origin: '*',
+    origin: origins,
     methods: ['GET', 'POST']
   }
 });
 
 // Middleware
 app.use(cors({
-  origin: '*',
+  origin: origins,
   methods: ['GET', 'POST', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -41,35 +44,37 @@ app.use('/api/auth', authRoutes);
 app.use('/api', telemetryRoutes);
 app.use('/api', deviceRoutes);
 
-// Root route for basic status check
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'IoT Log Dashboard API is running',
-    version: '1.0.0',
-    status: 'online'
-  });
-});
-
 // Health check definition (ideal for AWS target groups / render checks)
 app.get('/health', (req, res) => res.json({ status: 'OK', uptime: process.uptime() }));
 
-// Initialize MongoDB
-connectDB();
+// Bootstrap function to handle async initialization
+const bootstrap = async () => {
+  try {
+    // Initialize MongoDB and wait
+    await connectDB();
 
-// Initialize MQTT and pass the socket instance inside
-initMqttService(io);
+    // Initialize MQTT and pass the socket instance inside
+    initMqttService(io);
 
-// WebSocket lifecycle monitoring
-io.on('connection', (socket) => {
-  logger.info(`WSS: Frontend Dashboard Client Connected [${socket.id}]`);
-  
-  socket.on('disconnect', () => {
-    logger.info(`WSS: Client Disconnected [${socket.id}]`);
-  });
-});
+    // WebSocket lifecycle monitoring
+    io.on('connection', (socket) => {
+      logger.info(`WSS: Frontend Dashboard Client Connected [${socket.id}]`);
+      
+      socket.on('disconnect', () => {
+        logger.info(`WSS: Client Disconnected [${socket.id}]`);
+      });
+    });
 
-// Server boot-up
-server.listen(env.PORT, () => {
-  logger.info(`SERVER: Start success! API listening on http://localhost:${env.PORT}`);
-  logger.info('WSS: WebSocket Server is attached and active.');
-});
+    // Server boot-up
+    server.listen(env.PORT, () => {
+      logger.info(`SERVER: Start success! API listening on http://localhost:${env.PORT}`);
+      logger.info('WSS: WebSocket Server is attached and active.');
+    });
+
+  } catch (error) {
+    logger.error('FATAL: Startup failed:', error.message);
+    process.exit(1);
+  }
+};
+
+bootstrap();

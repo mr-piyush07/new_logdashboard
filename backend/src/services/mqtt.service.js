@@ -52,7 +52,7 @@ const processDynamicPayload = (rawPayload, allowedComponents) => {
 const initMqttService = (socketIoInstance) => {
   io = socketIoInstance;
 
-  mqttClient.on('connect', () => {
+  const subscribeToTopics = () => {
     const legacyTopic = 'devices/+/telemetry';     // Old hardware
     const servoTopic = 'devices/servo/+/telemetry';  // New servo architecture routing
     const dynamicTopic = 'devices/dynamic/+/telemetry';
@@ -64,20 +64,24 @@ const initMqttService = (socketIoInstance) => {
         logger.info(`SUCCESS: Subscribed to topics: ${legacyTopic}, ${servoTopic}, ${dynamicTopic}`);
       }
     });
+  };
+
+  // If already connected, subscribe immediately
+  if (mqttClient.connected) {
+    logger.info('MQTT already connected at initialization. Subscribing immediately.');
+    subscribeToTopics();
+  }
+
+  mqttClient.on('connect', () => {
+    logger.info('MQTT Client (re)connected. Ensuring subscriptions are active...');
+    subscribeToTopics();
   });
 
   mqttClient.on('message', async (topic, message) => {
+    logger.debug(`INCOMING MQTT: Topic=[${topic}] Payload=[${message.toString()}]`);
     try {
       const payloadString = message.toString();
-      logger.info(`INCOMING MQTT: Topic=[${topic}] Payload=[${payloadString}]`);
-      
-      let rawPayload;
-      try {
-        rawPayload = JSON.parse(payloadString);
-      } catch (parseErr) {
-        logger.error(`MQTT JSON Parse Error on topic ${topic}: ${parseErr.message}`);
-        return;
-      }
+      const rawPayload = JSON.parse(payloadString);
 
       // --- LEGACY SERVO PIPELINE ---
       // Matches both 3-level 'devices/esp32_01/telemetry' and 4-level 'devices/servo/...'

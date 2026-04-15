@@ -9,7 +9,7 @@ dotenv.config();
 const envSchema = z.object({
   PORT: z.string().default('3000'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  FRONTEND_URL: z.string().url().default('http://localhost:5173'),
+  FRONTEND_URL: z.string().default('http://localhost:5173'),
   MONGODB_URI: z.string().url(),
   MQTT_HOST: z.string(),
   MQTT_PORT: z.string().regex(/^\d+$/).transform(Number),
